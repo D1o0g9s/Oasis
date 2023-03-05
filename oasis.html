@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="index.css" type="text/css" />
+  <title>Oasis</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>Oasis 💧</h1>
+    <div id="mainDiv">
+        
+        <div class="tab">
+            <button class="tablinks" id="pricesButton" onclick="openTab(event, 'tabPrices')">Permit Prices</button>
+            <button class="tablinks" onclick="openTab(event, 'tabUsage')">Water Usage</button>
+            <button class="tablinks" onclick="openTab(event, 'tabRain')">Precipitation</button>
+        </div>
+
+        <div id="tabPrices" class="tabcontent">
+            <div id="plotPrices"></div>
+        </div>
+        
+        <div id="tabUsage" class="tabcontent"  >
+            <div id="plotUsage"></div>
+        </div>
+
+        <div id="tabRain" class="tabcontent"  >
+            <div id="plotRain"></div>
+        </div>
+        </div>
+        
+        <div id="appDiv">
+            
+            <div id="innerAppDiv">
+                <div id="yourStats">
+                    <h2>Your Usage</h2>
+                    <label for="qtyOwned">Your Gallon Permits: </label>
+                    <input id="qtyOwned" class="readOnlyInput" name="qtyOwned" readonly value="3523">
+                    <br><br>
+
+                    <label for="avgMonthlyUsage">Your Monthly Usage: </label>
+                    <input id="avgMonthlyUsage" class="readOnlyInput" name="avgMonthlyUsage" readonly value="2023">
+                    <br><br>
+                </div>
+
+                <div id="purchaseApp">
+
+                    <h2>Trade Permits</h2>
+                    <label for="price">Current Price / Gallon: </label>
+                        <input id="price" class="readOnlyInput" name="price" readonly value="0.008">
+                    <br><br>
+
+                    <label for="quantity">Quantity: </label>
+                    <input type="number" id="quantity" onchange="calculateTotal()"><br><br>
+
+                    <label for="total">Total:</label>
+                    <input type="currency" id="total" class="readOnlyInput" name="total" readonly><br><br>
+
+                    <button class="tradeButton" onclick="buyButton()">Buy</button>
+                    <button class="tradeButton" onclick="sellButton()">Sell</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+  <script>
+    // Manages tab changes
+    function openTab(evt, tabName) {
+        var i, tabcontent, tablinks;
+        tabcontent = document.getElementsByClassName("tabcontent");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].style.display = "none";
+        }
+        tablinks = document.getElementsByClassName("tablinks");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+        document.getElementById(tabName).style.display = "block";
+        if (evt){
+            evt.currentTarget.className += " active";
+        } 
+            
+    }
+
+    // Calculate total when value in the quantity box changes
+    function calculateTotal() {
+      let quantity = document.getElementById("quantity").value;
+      let price = 0.19;
+      let total = quantity * price;
+      document.getElementById("total").value = total;
+      
+    }
+
+    // Trading functionality
+    function buyButton() {
+        let quantity = parseInt(document.getElementById("quantity").value);
+        let currentQty = parseInt(document.getElementById("qtyOwned").value);
+        document.getElementById("qtyOwned").value = currentQty + quantity;
+    }
+    function sellButton() {
+        let quantity = parseInt(document.getElementById("quantity").value);
+        let currentQty = parseInt(document.getElementById("qtyOwned").value);
+        document.getElementById("qtyOwned").value = currentQty - quantity;
+    }
+
+    // Plotting
+    function plotTimeSeries(csvFilePath, xColumn, yColumn, y2Column, title, elementId, addLine) {
+        Plotly.d3.csv(csvFilePath, function(err, rows){
+            if (err) console.error(err);
+            
+            var trace = {
+            x: rows.map(row => row[xColumn]),
+            y: rows.map(row => row[yColumn]),
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: yColumn,
+            };
+
+            
+            var layout = {
+            plot_bgcolor: 'rgba(0, 0, 0, 0)',
+            paper_bgcolor: 'rgba(0, 0, 0, 0)',
+            title: title,
+            xaxis: {
+                title: xColumn,
+            },
+            yaxis: {
+                title: yColumn,
+            }
+            };
+
+            var data = [trace];
+
+            if (y2Column) {
+                var trace2 = {
+                x: rows.map(row => row[xColumn]),
+                y: rows.map(row => row[y2Column]),
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: y2Column,
+                yaxis: 'y2'
+                };
+
+                layout['yaxis2'] = 
+                {
+                    title: y2Column,
+                    overlaying: 'y',
+                    side: 'right'
+                }
+
+                if (addLine) {
+                    layout['shapes'] = 
+                    [{
+                        type: 'line',
+                        x0: -10,
+                        y0: 55000,
+                        x1: 0,
+                        y1: 55000,
+                        line: {
+                            color: 'red',
+                            width: 2
+                            }
+                    }]
+                }
+                
+
+                data.push(trace2)
+            }
+            
+            Plotly.newPlot(elementId, data, layout);
+        });
+    }
+
+    // Plot all plots to set up 
+    plotTimeSeries('data/prices.csv', 'Day', 'Price (USD)', 'Your Usage (Gallons)', 'Permit Prices', 'plotPrices');
+    plotTimeSeries('data/usage.csv', 'Day', 'Community Usage', 'Your Usage (Gallons)', 'Water Usage', 'plotUsage', true);
+    plotTimeSeries('data/rainfall.csv', 'Day', 'Rainfall (in)', null, 'Precipitation', 'plotRain');
+
+    // Pre-click the "Permit Prices" button
+    const delay = ms => new Promise(res => setTimeout(res, ms));
+
+    document.addEventListener("DOMContentLoaded", async function(event) { 
+        await delay(100);
+        document.getElementById("pricesButton").click();
+    });
+  </script>
+</body>
+</html>
